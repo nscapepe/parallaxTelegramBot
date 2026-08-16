@@ -1,12 +1,13 @@
 const{ Markup } = require('telegraf')
 const path = require('path')
 
-function materialHandler(bot, channel, channelURL) {
-return ctx.answerCbQuery()
+function materialHandler(bot, CHANNEL, CHANNEL_URL) {
+    return async (ctx) => {
+    await ctx.answerCbQuery()
 
     try {
         const member = await bot.telegram.getChatMember(
-                channel,
+                CHANNEL,
                 ctx.from.id
             );
 
@@ -18,7 +19,7 @@ return ctx.answerCbQuery()
                     [
                         Markup.button.url(
                         'Подписаться на канал',
-                        channelURL
+                        CHANNEL_URL
                     )
                     ],
                     [
@@ -45,3 +46,6 @@ return ctx.answerCbQuery()
         
     }
 }
+}
+
+module.exports = materialHandler
