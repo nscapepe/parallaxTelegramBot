@@ -1,9 +1,9 @@
 require('dotenv').config();
 
-const channel = process.env.CHANNEL;
-const channelURL = process.env.CHANNEL_URL;
+const CHANNEL = process.env.CHANNEL;
+const CHANNEL_URL = process.env.CHANNEL_URL;
 
 module.exports = {
-    channel,
-    channelURL
+    CHANNEL,
+    CHANNEL_URL
 }

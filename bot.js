@@ -2,19 +2,47 @@ require('dotenv').config();
 
 const { Telegraf } = require('telegraf');
 
-const startHandler = require('./handlers/start');
-const materialHandler = require('./handlers/material');
+const { startHandler } = require('./handlers/start');
 
-const bot = new Telegraf(process.env.BOT_TOKEN);
+const {
+    materialHandler,
+    checkSubscriptionHandler,
+    materialsMenuHandler,
+    mainMenuHandler,
+    musicMainMenuHandler,
+} = require('./handlers/material');
 
-const CHANNEL = process.env.CHANNEL;
-const CHANNEL_URL = process.env.CHANNEL_URL;
+const bot = new Telegraf(
+    process.env.BOT_TOKEN
+);
 
-bot.start(startHandler)
+bot.start(startHandler);
 
 bot.action(
-    'get_material',
-    materialHandler(bot, CHANNEL, CHANNEL_URL)
-)
+    'materials',
+    materialsMenuHandler()
+);
+
+bot.action(
+    /^material:(.+)$/,
+    materialHandler(bot)
+);
+
+bot.action(
+    /^check:(.+)$/,
+    checkSubscriptionHandler(bot)
+);
+
+bot.action(
+    'main_menu',
+    mainMenuHandler()
+);
+
+bot.action(
+    'music_main_menu',
+    musicMainMenuHandler()
+);
 
 bot.launch();
+
+console.log('Бот запущен');

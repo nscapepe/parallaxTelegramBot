@@ -1,24 +1,42 @@
 const{ Markup } = require('telegraf')
 const path = require('path')
 
-function startHandler(ctx) {
-    return ctx.replyWithPhoto(
+const CONTENT = require('../content')
+
+function getMainMenu(){
+    return Markup.inlineKeyboard([
+        [
+            Markup.button.callback(
+                'Забрать материалы',
+                'materials'
+            )
+        ],
+        [
+            Markup.button.url(
+                'Telegram',
+                process.env.CHANNEL_URL
+            ),
+            Markup.button.url(
+                'Сотрудничество',
+                process.env.COOPERATION_URL
+            )
+        ]
+    ])
+}
+
+async function startHandler(ctx) {
+    await ctx.replyWithPhoto(
         {
-        source: path.join(__dirname,'..', 'zastavka.jpg')
+        source: path.join(__dirname,'..', CONTENT.cover)
         },
         {
-            caption:
-            'Parallax qq \n\n Динислам лох :)',
-            ...Markup.inlineKeyboard([
-                [
-                    Markup.button.callback(
-                        'Получить материал',
-                        'get_material'
-                    )
-                ]
-            ])
+            caption: CONTENT.description,
+            ...getMainMenu(),
         }
     )
 }
 
-module.exports = startHandler
+module.exports = {
+    startHandler,
+    getMainMenu
+}
