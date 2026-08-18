@@ -8,16 +8,19 @@ const CONTENT = {
     materials: {
         fonts: {
             title: 'Шрифты',
+            type: 'file',
             file: 'files/fonts.zip',
         },
 
         music: {
             title: 'Музыка',
-            file: 'files/music.zip',
+            type: 'url',
+            url: 'https://disk.yandex.ru/d/Cb0mDbhxRkZH8g',
         },
 
         sfx: {
             title: 'SFX',
+            type: 'file',
             file: 'files/sfx.zip',
         },
     },

@@ -70,30 +70,7 @@ async function isSubscribed(bot, userId) {
     );
 }
 
-async function sendMaterial(ctx, materialKey) {
-    const material = CONTENT.materials[materialKey];
 
-    if (!material) {
-        await ctx.editMessageCaption(
-            'Материал не найден.',
-            getMainMenu()
-        );
-        return;
-    }
-
-    await ctx.editMessageCaption(
-        'Держи',
-        getAfterDownloadMenu()
-    );
-
-    await ctx.replyWithDocument({
-        source: path.join(
-            __dirname,
-            '..',
-            material.file
-        ),
-    });
-}
 
 async function showSubscriptionMessage(ctx, materialKey) {
     await ctx.editMessageCaption(
@@ -101,6 +78,93 @@ async function showSubscriptionMessage(ctx, materialKey) {
         'Материалы доступны подписчикам моего Telegram-канала',
         getSubscriptionMenu(materialKey)
     );
+}
+
+async function sendMaterial(ctx, materialKey) {
+    const material =
+        CONTENT.materials[materialKey];
+
+    if (!material) {
+        await ctx.reply('Материал не найден.');
+        return;
+    }
+
+    const message =
+        ctx.callbackQuery.message;
+
+    // Меняем текущее сообщение
+    if (message.photo) {
+        await ctx.editMessageCaption(
+            'забирай ↓'
+        );
+    } else {
+        await ctx.editMessageText(
+            'забирай ↓'
+        );
+    }
+
+    // Музыка -> ссылка на Яндекс Диск
+    if (materialKey === 'music') {
+        await ctx.reply(
+            'Музыка готова 👇',
+            Markup.inlineKeyboard([
+                [
+                    Markup.button.url(
+                        'Скачать музыку ↗️',
+                        'https://disk.yandex.ru/d/Cb0mDbhxRkZH8g'
+                    ),
+                ],
+            ])
+        );
+    }
+
+    // Шрифты / SFX -> отправляем файл
+    else {
+        await ctx.replyWithDocument({
+            source: path.join(
+                __dirname,
+                '..',
+                material.file
+            ),
+        });
+    }
+
+    // Кнопки после получения
+    await ctx.reply(
+        'Выбери, что дальше:',
+        getAfterDownloadMenu()
+    );
+}
+
+function materialsMenuHandler() {
+    return async (ctx) => {
+        try {
+            await ctx.answerCbQuery();
+
+            const message = ctx.callbackQuery.message;
+
+            const keyboard = getCategoriesMenu();
+            const text = 'Выбери, что хочешь забрать 👇';
+
+            if (message.photo) {
+                await ctx.editMessageCaption(
+                    text,
+                    keyboard
+                );
+            } else {
+                await ctx.editMessageText(
+                    text,
+                    keyboard
+                );
+            }
+
+        } catch (error) {
+            console.error(
+                'MATERIALS MENU ERROR:',
+                error
+            );
+        }
+    };
 }
 
 function materialHandler(bot) {
@@ -111,31 +175,23 @@ function materialHandler(bot) {
             const materialKey =
                 ctx.callbackQuery.data.split(':')[1];
 
-            if (materialKey === 'music') {
-                await ctx.editMessageCaption(
-                    'пак музыки пока не собран.\n\n' +
-                    'я добавлю его сюда, как только закончу 👀',
-                    Markup.inlineKeyboard([
-                        [
-                            Markup.button.callback(
-                                'Главное меню',
-                                'music_main_menu'
-                            ),
-                        ],
-                    ])
-                );
-
-                return;
-            }
-
             const material =
                 CONTENT.materials[materialKey];
 
             if (!material) {
-                await ctx.editMessageCaption(
-                    'Материал не найден.',
-                    getMainMenu()
-                );
+                const message = ctx.callbackQuery.message;
+
+                if (message.photo) {
+                    await ctx.editMessageCaption(
+                        'Материал не найден.',
+                        getMainMenu()
+                    );
+                } else {
+                    await ctx.editMessageText(
+                        'Материал не найден.',
+                        getMainMenu()
+                    );
+                }
 
                 return;
             }
@@ -160,7 +216,10 @@ function materialHandler(bot) {
             );
 
         } catch (error) {
-            console.error('MATERIAL ERROR:', error);
+            console.error(
+                'MATERIAL ERROR:',
+                error
+            );
         }
     };
 }
@@ -225,10 +284,22 @@ function materialsMenuHandler() {
         try {
             await ctx.answerCbQuery();
 
-            await ctx.editMessageCaption(
-                'Выбери, что хочешь забрать 👇',
-                getCategoriesMenu()
-            );
+            const message = ctx.callbackQuery.message;
+            const keyboard = getCategoriesMenu();
+            const text = 'Выбери, что хочешь забрать 👇';
+
+            if (message.photo) {
+                await ctx.editMessageCaption(
+                    text,
+                    keyboard
+                );
+            } else {
+                await ctx.editMessageText(
+                    text,
+                    keyboard
+                );
+            }
+
         } catch (error) {
             console.error(
                 'MATERIALS MENU ERROR:',
