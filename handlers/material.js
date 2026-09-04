@@ -81,86 +81,77 @@ async function showSubscriptionMessage(ctx, materialKey) {
 }
 
 async function sendMaterial(ctx, materialKey) {
-    const material =
-        CONTENT.materials[materialKey];
+    const material = CONTENT.materials[materialKey];
 
     if (!material) {
         await ctx.reply('Материал не найден.');
         return;
     }
 
-    const message =
-        ctx.callbackQuery.message;
+    const message = ctx.callbackQuery.message;
 
-    // Меняем текущее сообщение
+    // Меняем главное сообщение на "забирай ↓"
     if (message.photo) {
-        await ctx.editMessageCaption(
-            'забирай ↓'
-        );
+        await ctx.editMessageCaption('забирай ↓');
     } else {
-        await ctx.editMessageText(
-            'забирай ↓'
-        );
+        await ctx.editMessageText('забирай ↓');
     }
 
-    // Музыка -> ссылка на Яндекс Диск
-    if (materialKey === 'music') {
-        await ctx.reply(
-            'Музыка готова 👇',
-            Markup.inlineKeyboard([
-                [
-                    Markup.button.url(
-                        'Скачать музыку ↗️',
-                        'https://disk.yandex.ru/d/Cb0mDbhxRkZH8g'
-                    ),
-                ],
-            ])
-        );
-    }
+    // Отправляем ссылку
+    await ctx.reply(
+        'ссылка готова',
+        Markup.inlineKeyboard([
+            [
+                Markup.button.url(
+                    material.title,
+                    material.url
+                )
+            ]
+        ])
+    );
 
-    // Шрифты / SFX -> отправляем файл
-    else {
-        await ctx.replyWithDocument({
-            source: path.join(
-                __dirname,
-                '..',
-                material.file
-            ),
-        });
-    }
-
-    // Кнопки после получения
+    // Кнопки после получения материала
     await ctx.reply(
         'Выбери, что дальше:',
         getAfterDownloadMenu()
     );
 }
 
-function materialsMenuHandler() {
+async function materialHandler(bot) {
     return async (ctx) => {
         try {
             await ctx.answerCbQuery();
 
-            const message = ctx.callbackQuery.message;
+            const materialKey =
+                ctx.callbackQuery.data.split(':')[1];
 
-            const keyboard = getCategoriesMenu();
-            const text = 'Выбери, что хочешь забрать 👇';
+            const material =
+                CONTENT.materials[materialKey];
 
-            if (message.photo) {
-                await ctx.editMessageCaption(
-                    text,
-                    keyboard
-                );
-            } else {
-                await ctx.editMessageText(
-                    text,
-                    keyboard
-                );
+            if (!material) {
+                await ctx.answerCbQuery('Материал не найден');
+                return;
             }
+
+            const subscribed =
+                await isSubscribed(bot, ctx.from.id);
+
+            if (!subscribed) {
+                await showSubscriptionMessage(
+                    ctx,
+                    materialKey
+                );
+                return;
+            }
+
+            await sendMaterial(
+                ctx,
+                materialKey
+            );
 
         } catch (error) {
             console.error(
-                'MATERIALS MENU ERROR:',
+                'MATERIAL ERROR:',
                 error
             );
         }

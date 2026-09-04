@@ -3,7 +3,7 @@ const path = require('path')
 
 const CONTENT = require('../content')
 
-function getMainMenu(){
+function getMainMenu() {
     return Markup.inlineKeyboard([
         [
             Markup.button.callback(
@@ -14,14 +14,20 @@ function getMainMenu(){
         [
             Markup.button.url(
                 'Telegram',
-                process.env.CHANNEL_URL
+                'https://t.me/parallax_aep'
             ),
             Markup.button.url(
                 'Сотрудничество',
-                process.env.COOPERATION_URL
+                'https://t.me/parallaxsizm'
+            )
+        ],
+        [
+            Markup.button.url(
+                'Тех. помощь',
+                'https://t.me/nscapedev'
             )
         ]
-    ])
+    ]);
 }
 
 async function startHandler(ctx) {
