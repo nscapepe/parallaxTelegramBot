@@ -20,14 +20,18 @@ async function createUser({ telegramId, username, firstName, source }) {
     return rows[0];
 }
 
-// Шаг 2 + Шаг 4: регистрирует юзера при /start и пишет источник из deep link.
-// ctx.startPayload — это и есть Шаг 3: Telegraf сам парсит /start <payload>.
+// Регистрирует юзера при /start и пишет источник из deep link.
+// ctx.startPayload — Telegraf сам парсит /start <payload>.
 async function registerUser(ctx) {
     const telegramId = ctx.from.id;
 
     const existing = await findUserByTelegramId(telegramId);
+
     if (existing) {
-        return { user: existing, isNew: false };
+        return {
+            user: existing,
+            isNew: false
+        };
     }
 
     const source = ctx.startPayload || 'direct';
@@ -39,10 +43,35 @@ async function registerUser(ctx) {
         source,
     });
 
-    return { user, isNew: true };
+    return {
+        user,
+        isNew: true
+    };
 }
 
-// Шаг 5: статистика
+// Отмечает первое открытие меню материалов.
+async function markMaterialsOpened(telegramId) {
+    await pool.query(
+        `UPDATE users
+         SET opened_materials_at = NOW()
+         WHERE telegram_id = $1
+           AND opened_materials_at IS NULL`,
+        [telegramId]
+    );
+}
+
+// Отмечает первый успешно подтверждённый факт подписки.
+async function markSubscribed(telegramId) {
+    await pool.query(
+        `UPDATE users
+         SET subscribed_at = NOW()
+         WHERE telegram_id = $1
+           AND subscribed_at IS NULL`,
+        [telegramId]
+    );
+}
+
+// Общая статистика для админ-панели.
 async function getStats() {
     const totalRes = await pool.query(
         'SELECT COUNT(*)::int AS count FROM users'
@@ -60,24 +89,59 @@ async function getStats() {
         WHERE created_at >= NOW() - INTERVAL '7 days'
     `);
 
-    const bySourceRes = await pool.query(`
+    const openedRes = await pool.query(`
+        SELECT COUNT(*)::int AS count
+        FROM users
+        WHERE opened_materials_at IS NOT NULL
+    `);
+
+    const subscribedRes = await pool.query(`
+        SELECT COUNT(*)::int AS count
+        FROM users
+        WHERE subscribed_at IS NOT NULL
+    `);
+
+    const total = totalRes.rows[0].count;
+    const subscribed = subscribedRes.rows[0].count;
+
+    return {
+        total,
+        last24h: todayRes.rows[0].count,
+        last7d: weekRes.rows[0].count,
+        openedMaterials: openedRes.rows[0].count,
+        subscribed,
+        conversion: total > 0 ? (subscribed / total) * 100 : 0,
+    };
+}
+
+// Статистика по источникам.
+async function getSourceStats() {
+    const { rows } = await pool.query(`
         SELECT COALESCE(source, 'direct') AS source, COUNT(*)::int AS count
         FROM users
         GROUP BY source
         ORDER BY count DESC
     `);
 
-    return {
-        total: totalRes.rows[0].count,
-        last24h: todayRes.rows[0].count,
-        last7d: weekRes.rows[0].count,
-        bySource: bySourceRes.rows,
-    };
+    return rows;
+}
+
+// Все Telegram ID пользователей для рассылки.
+async function getAllUserIds() {
+    const { rows } = await pool.query(
+        'SELECT telegram_id FROM users'
+    );
+
+    return rows.map((row) => row.telegram_id);
 }
 
 module.exports = {
     findUserByTelegramId,
     createUser,
     registerUser,
+    markMaterialsOpened,
+    markSubscribed,
     getStats,
+    getSourceStats,
+    getAllUserIds,
 };

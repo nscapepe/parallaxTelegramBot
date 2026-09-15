@@ -3,6 +3,18 @@ const path = require('path');
 
 const CONTENT = require('../content');
 const { getMainMenu } = require('./start');
+const {
+    logMaterialClaim,
+    getAllMaterials,
+    getMaterialByKey,
+} = require('../db/materials');
+const { markMaterialsOpened, markSubscribed } = require('../db/users');
+
+function displayLabel(material) {
+    return material.emoji
+        ? `${material.emoji} ${material.label}`
+        : material.label;
+}
 
 function musicMainMenuHandler() {
     return async (ctx) => {
@@ -15,14 +27,24 @@ function musicMainMenuHandler() {
     };
 }
 
-function getCategoriesMenu() {
-    return Markup.inlineKeyboard([
-        [
-            Markup.button.callback('Шрифты', 'material:fonts'),
-            Markup.button.callback('Музыка', 'material:music'),
-            Markup.button.callback('SFX', 'material:sfx'),
-        ],
-    ]);
+// Кнопки категорий строятся динамически из таблицы materials,
+// чтобы админ мог добавлять/убирать материалы без изменения кода.
+async function getCategoriesMenu() {
+    const materials = await getAllMaterials();
+
+    const buttons = materials.map((material) =>
+        Markup.button.callback(
+            displayLabel(material),
+            `material:${material.key}`
+        )
+    );
+
+    const rows = [];
+    for (let i = 0; i < buttons.length; i += 3) {
+        rows.push(buttons.slice(i, i + 3));
+    }
+
+    return Markup.inlineKeyboard(rows);
 }
 
 function getSubscriptionMenu(materialKey) {
@@ -70,22 +92,33 @@ async function isSubscribed(bot, userId) {
     );
 }
 
-
-
 async function showSubscriptionMessage(ctx, materialKey) {
-    await ctx.editMessageCaption(
+    const message = ctx.callbackQuery.message;
+    const text =
         'Почти готово\n\n' +
-        'Материалы доступны подписчикам моего Telegram-канала',
-        getSubscriptionMenu(materialKey)
-    );
+        'Материалы доступны подписчикам моего Telegram-канала';
+    const keyboard = getSubscriptionMenu(materialKey);
+
+    if (message.photo) {
+        await ctx.editMessageCaption(text, keyboard);
+    } else {
+        await ctx.editMessageText(text, keyboard);
+    }
 }
 
 async function sendMaterial(ctx, materialKey) {
-    const material = CONTENT.materials[materialKey];
+    const material = await getMaterialByKey(materialKey);
 
     if (!material) {
         await ctx.reply('Материал не найден.');
         return;
+    }
+
+    try {
+        await logMaterialClaim(ctx.from.id, materialKey);
+        await markSubscribed(ctx.from.id);
+    } catch (error) {
+        console.error('LOG MATERIAL CLAIM ERROR:', error);
     }
 
     const message = ctx.callbackQuery.message;
@@ -103,7 +136,7 @@ async function sendMaterial(ctx, materialKey) {
         Markup.inlineKeyboard([
             [
                 Markup.button.url(
-                    material.title,
+                    displayLabel(material),
                     material.url
                 )
             ]
@@ -117,47 +150,6 @@ async function sendMaterial(ctx, materialKey) {
     );
 }
 
-async function materialHandler(bot) {
-    return async (ctx) => {
-        try {
-            await ctx.answerCbQuery();
-
-            const materialKey =
-                ctx.callbackQuery.data.split(':')[1];
-
-            const material =
-                CONTENT.materials[materialKey];
-
-            if (!material) {
-                await ctx.answerCbQuery('Материал не найден');
-                return;
-            }
-
-            const subscribed =
-                await isSubscribed(bot, ctx.from.id);
-
-            if (!subscribed) {
-                await showSubscriptionMessage(
-                    ctx,
-                    materialKey
-                );
-                return;
-            }
-
-            await sendMaterial(
-                ctx,
-                materialKey
-            );
-
-        } catch (error) {
-            console.error(
-                'MATERIAL ERROR:',
-                error
-            );
-        }
-    };
-}
-
 function materialHandler(bot) {
     return async (ctx) => {
         try {
@@ -166,22 +158,16 @@ function materialHandler(bot) {
             const materialKey =
                 ctx.callbackQuery.data.split(':')[1];
 
-            const material =
-                CONTENT.materials[materialKey];
+            const material = await getMaterialByKey(materialKey);
 
             if (!material) {
                 const message = ctx.callbackQuery.message;
+                const text = 'Материал не найден.';
 
                 if (message.photo) {
-                    await ctx.editMessageCaption(
-                        'Материал не найден.',
-                        getMainMenu()
-                    );
+                    await ctx.editMessageCaption(text, getMainMenu());
                 } else {
-                    await ctx.editMessageText(
-                        'Материал не найден.',
-                        getMainMenu()
-                    );
+                    await ctx.editMessageText(text, getMainMenu());
                 }
 
                 return;
@@ -221,8 +207,7 @@ function checkSubscriptionHandler(bot) {
             const materialKey =
                 ctx.callbackQuery.data.split(':')[1];
 
-            const material =
-                CONTENT.materials[materialKey];
+            const material = await getMaterialByKey(materialKey);
 
             if (!material) {
                 await ctx.answerCbQuery(
@@ -243,11 +228,17 @@ function checkSubscriptionHandler(bot) {
                     'Пока не вижу подписку 👀'
                 );
 
-                await ctx.editMessageCaption(
+                const message = ctx.callbackQuery.message;
+                const text =
                     'пока не вижу подписку 👀\n\n' +
-                    'подпишись и нажми «Проверить» ещё раз',
-                    getSubscriptionMenu(materialKey)
-                );
+                    'подпишись и нажми «Проверить» ещё раз';
+                const keyboard = getSubscriptionMenu(materialKey);
+
+                if (message.photo) {
+                    await ctx.editMessageCaption(text, keyboard);
+                } else {
+                    await ctx.editMessageText(text, keyboard);
+                }
 
                 return;
             }
@@ -275,8 +266,10 @@ function materialsMenuHandler() {
         try {
             await ctx.answerCbQuery();
 
+            await markMaterialsOpened(ctx.from.id);
+
             const message = ctx.callbackQuery.message;
-            const keyboard = getCategoriesMenu();
+            const keyboard = await getCategoriesMenu();
             const text = 'Выбери, что хочешь забрать 👇';
 
             if (message.photo) {
